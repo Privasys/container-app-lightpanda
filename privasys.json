@@ -13,11 +13,17 @@
           },
           "format": {
             "type": "string",
-            "enum": ["markdown", "html"],
-            "description": "Output format for the page content (default: markdown)"
+            "enum": [
+              "markdown",
+              "html"
+            ],
+            "description": "Output format for the page content (default: markdown)",
+            "default": "markdown"
           }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
       }
     }
   ]
