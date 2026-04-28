@@ -1,0 +1,4 @@
+# Build artifacts
+/container-app-lightpanda
+/lightpanda-api
+*.exe
