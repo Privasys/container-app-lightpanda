@@ -36,6 +36,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/browse", handleBrowse)
 	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/healthz", handleHealth)
+	// MCP-compatible endpoints so any MCP-aware agent (confidential-ai
+	// orchestrator) can discover and invoke this tool over HTTP.
+	mux.HandleFunc("/api/v1/mcp/tools", handleMCPTools)
+	mux.HandleFunc("/api/v1/mcp/tools/", handleMCPInvoke)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -146,6 +151,55 @@ func fetchURL(ctx context.Context, url, format string) (string, error) {
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ---------------------------------------------------------------------------
+//  /api/v1/mcp/tools[/<name>] — MCP discovery + invoke adapter
+// ---------------------------------------------------------------------------
+
+var browseToolDescriptor = map[string]any{
+	"name":        "browse",
+	"description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Call this whenever the user references a URL and you need the page contents to answer.",
+	"input_schema": map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"url": map[string]any{
+				"type":        "string",
+				"description": "The URL of the web page to fetch (must start with http:// or https://)",
+			},
+			"format": map[string]any{
+				"type":        "string",
+				"enum":        []string{"markdown", "html"},
+				"description": "Output format (default: markdown)",
+			},
+		},
+		"required": []string{"url"},
+	},
+	"requires_user_confirmation": false,
+}
+
+func handleMCPTools(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tools": []any{browseToolDescriptor},
+	})
+}
+
+func handleMCPInvoke(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/api/v1/mcp/tools/")
+	switch name {
+	case "browse":
+		handleBrowse(w, r)
+	default:
+		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown tool: %s", name))
+	}
 }
 
 // ---------------------------------------------------------------------------
