@@ -65,6 +65,7 @@ jobs:
             echo "json=$(jq -c . privasys.json)" >> "$GITHUB_OUTPUT"
           fi
 
+      - id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -72,6 +73,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
+            org.privasys.manifest=${{ steps.manifest.outputs.json }}
           provenance: true
           sbom: true
           cache-from: type=gha
