@@ -53,13 +53,25 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - id: build
+      # Embed privasys.json (MCP manifest) as an OCI image label so the
+      # management-service can auto-detect tools/UI for package-source
+      # container apps via FetchOCILabel("org.privasys.manifest").
+      # Without this, the API Testing / AI Tools tabs are hidden in the
+      # developer portal.
+      - name: Read privasys.json
+        id: manifest
+        run: |
+          if [ -f privasys.json ]; then
+            echo "json=$(jq -c . privasys.json)" >> "$GITHUB_OUTPUT"
+          fi
+
         uses: docker/build-push-action@v6
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
           provenance: true
           sbom: true
           cache-from: type=gha
