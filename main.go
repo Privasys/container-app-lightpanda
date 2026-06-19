@@ -93,10 +93,10 @@ var validWaitUntil = map[string]bool{
 }
 
 const (
-	// 'done' (wait until all page operations finish) is lightpanda's own default
-	// when no wait condition is given, and best for capturing fully-rendered
-	// content. 'networkidle' resolves earlier (when the network goes quiet).
-	defaultWaitUntil = "done"
+	// 'networkidle' (capture when the network goes quiet) is the default: fast and
+	// good for most pages. 'done' (wait for all page operations) is available for
+	// fully-rendered capture but is slower and not always better.
+	defaultWaitUntil = "networkidle"
 	maxWaitMs        = 30000 // hard cap on the wait deadline (lightpanda default: 5000)
 )
 
@@ -226,7 +226,7 @@ var browseToolDescriptor = map[string]any{
 			"wait_until": map[string]any{
 				"type":        "string",
 				"enum":        []string{"load", "domcontentloaded", "networkidle", "networkalmostidle", "done"},
-				"description": "When to capture the page. 'done' (default) waits until ALL page operations finish — best for fully-rendered content. 'networkidle' captures earlier, when the network goes quiet (faster, but may miss late content). 'networkalmostidle' tolerates a couple of lingering connections (keep-alive/analytics). 'load' / 'domcontentloaded' fire earliest. This is the lever for how long to wait — wait_ms is only the deadline, not a delay.",
+				"description": "When to capture the page. 'networkidle' (default) captures when the network goes quiet — good for most pages. 'done' waits until ALL page operations finish (slower, fullest render). 'networkalmostidle' tolerates a couple of lingering connections (keep-alive/analytics). 'load' / 'domcontentloaded' fire earliest. This is the lever for how long to wait — wait_ms is only the deadline, not a delay.",
 			},
 			"wait_selector": map[string]any{
 				"type":        "string",
