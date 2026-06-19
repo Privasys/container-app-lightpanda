@@ -9,7 +9,10 @@ COPY main.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /lightpanda-api .
 
 # Stage 2: Final image with Lightpanda + API wrapper
-FROM lightpanda/browser:nightly AS lightpanda
+# Lightpanda 0.3.2 (latest, 2026-06-16). Pinned by digest for reproducible builds
+# instead of floating on a tag; bump the digest deliberately. (latest and nightly
+# share this digest as of 2026-06-18.)
+FROM lightpanda/browser:latest@sha256:f5e1bb6b11a7643796c02e89e3b6fb6c870be10d14dfee0db6d76b9afaf741dd AS lightpanda
 
 FROM debian:stable-slim
 

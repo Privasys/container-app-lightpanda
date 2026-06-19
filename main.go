@@ -80,16 +80,16 @@ type browseRequest struct {
 	// fetch/XHR has rendered. Pages that build their content client-side
 	// (search results, dashboards, SPAs) need to wait for the network to
 	// settle or for a specific element to appear.
-	WaitUntil    string `json:"wait_until"`    // load|domcontentloaded|networkidle|done (default: networkidle)
+	WaitUntil    string `json:"wait_until"`    // load|domcontentloaded|networkidle|networkalmostidle|done (default: networkidle)
 	WaitSelector string `json:"wait_selector"` // CSS selector to wait for before dumping
-	WaitMs       int    `json:"wait_ms"`       // additional settle delay in ms (capped)
+	WaitMs       int    `json:"wait_ms"`       // timeout cap for the wait condition, in ms
 }
 
 // validWaitUntil is the lifecycle-event whitelist accepted by lightpanda's
 // `fetch --wait-until`. Anything else is rejected so a bad value can't reach
-// the subprocess.
+// the subprocess. (networkalmostidle added in lightpanda 0.3.2.)
 var validWaitUntil = map[string]bool{
-	"load": true, "domcontentloaded": true, "networkidle": true, "done": true,
+	"load": true, "domcontentloaded": true, "networkidle": true, "networkalmostidle": true, "done": true,
 }
 
 const (
@@ -140,7 +140,7 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 		waitUntil = defaultWaitUntil
 	}
 	if !validWaitUntil[waitUntil] {
-		writeError(w, http.StatusBadRequest, "wait_until must be one of: load, domcontentloaded, networkidle, done")
+		writeError(w, http.StatusBadRequest, "wait_until must be one of: load, domcontentloaded, networkidle, networkalmostidle, done")
 		return
 	}
 	waitMs := req.WaitMs
@@ -222,8 +222,8 @@ var browseToolDescriptor = map[string]any{
 			},
 			"wait_until": map[string]any{
 				"type":        "string",
-				"enum":        []string{"load", "domcontentloaded", "networkidle", "done"},
-				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes idle — best for pages whose content loads via background fetch/XHR after the initial load; 'done' waits until all in-flight operations complete.",
+				"enum":        []string{"load", "domcontentloaded", "networkidle", "networkalmostidle", "done"},
+				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes fully idle — best for pages whose content loads via background fetch/XHR after the initial load; 'networkalmostidle' is more lenient (tolerates a couple of lingering connections, e.g. keep-alive/analytics) and is a good fallback when 'networkidle' never settles; 'done' waits until all in-flight operations complete.",
 			},
 			"wait_selector": map[string]any{
 				"type":        "string",

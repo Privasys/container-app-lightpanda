@@ -26,9 +26,10 @@
               "load",
               "domcontentloaded",
               "networkidle",
+              "networkalmostidle",
               "done"
             ],
-            "description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes idle — best for pages whose content loads via background fetch/XHR after the initial load; 'done' waits until all in-flight operations complete.",
+            "description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes fully idle — best for pages whose content loads via background fetch/XHR after the initial load; 'networkalmostidle' is more lenient (tolerates a couple of lingering connections, e.g. keep-alive/analytics) and is a good fallback when 'networkidle' never settles; 'done' waits until all in-flight operations complete.",
             "default": "networkidle"
           },
           "wait_selector": {
