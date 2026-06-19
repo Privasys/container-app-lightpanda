@@ -58,11 +58,17 @@ jobs:
       # container apps via FetchOCILabel("org.privasys.manifest").
       # Without this, the API Testing / AI Tools tabs are hidden in the
       # developer portal.
+      #
+      # The manifest is base64-encoded: a raw-JSON label value with several
+      # `","` sequences (e.g. multi-value enums) gets mangled by the build
+      # step's CSV-style label parsing, which strips interior quotes and
+      # produces invalid JSON. base64 has no quotes/commas, so it survives
+      # losslessly; the management-service decodes either form.
       - name: Read privasys.json
         id: manifest
         run: |
           if [ -f privasys.json ]; then
-            echo "json=$(jq -c . privasys.json)" >> "$GITHUB_OUTPUT"
+            echo "json=$(jq -c . privasys.json | base64 -w0)" >> "$GITHUB_OUTPUT"
           fi
 
       - id: build
