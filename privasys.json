@@ -25,11 +25,11 @@
             "enum": [
               "load",
               "domcontentloaded",
-              "networkidle0",
-              "networkidle2"
+              "networkidle",
+              "done"
             ],
-            "description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle2' (default) waits until the page has nearly stopped making network requests, and 'networkidle0' waits until it is fully idle. Use a networkidle option for pages whose content loads via background fetch/XHR after the initial load.",
-            "default": "networkidle2"
+            "description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes idle — best for pages whose content loads via background fetch/XHR after the initial load; 'done' waits until all in-flight operations complete.",
+            "default": "networkidle"
           },
           "wait_selector": {
             "type": "string",
@@ -37,7 +37,7 @@
           },
           "wait_ms": {
             "type": "integer",
-            "description": "Optional additional settle delay in milliseconds after the wait condition is met, before capturing (max 30000). Useful as a fallback when content keeps rendering briefly after the network goes idle."
+            "description": "Optional maximum time in milliseconds to wait for the wait_until condition before capturing anyway (a timeout cap, max 30000). Raise it for slow pages whose network takes a while to go idle."
           }
         },
         "required": [

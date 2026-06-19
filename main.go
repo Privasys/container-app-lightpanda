@@ -80,21 +80,21 @@ type browseRequest struct {
 	// fetch/XHR has rendered. Pages that build their content client-side
 	// (search results, dashboards, SPAs) need to wait for the network to
 	// settle or for a specific element to appear.
-	WaitUntil    string `json:"wait_until"`    // load|domcontentloaded|networkidle0|networkidle2 (default: networkidle2)
+	WaitUntil    string `json:"wait_until"`    // load|domcontentloaded|networkidle|done (default: networkidle)
 	WaitSelector string `json:"wait_selector"` // CSS selector to wait for before dumping
 	WaitMs       int    `json:"wait_ms"`       // additional settle delay in ms (capped)
 }
 
 // validWaitUntil is the lifecycle-event whitelist accepted by lightpanda's
-// `fetch --wait-until` (Puppeteer semantics). Anything else is rejected so a
-// bad value can't reach the subprocess.
+// `fetch --wait-until`. Anything else is rejected so a bad value can't reach
+// the subprocess.
 var validWaitUntil = map[string]bool{
-	"load": true, "domcontentloaded": true, "networkidle0": true, "networkidle2": true,
+	"load": true, "domcontentloaded": true, "networkidle": true, "done": true,
 }
 
 const (
-	defaultWaitUntil = "networkidle2" // wait until the page basically stops fetching
-	maxWaitMs        = 30000          // hard cap on the caller-supplied settle delay
+	defaultWaitUntil = "networkidle" // wait until network activity goes idle
+	maxWaitMs        = 30000         // hard cap on the caller-supplied settle delay
 )
 
 type browseResponse struct {
@@ -140,7 +140,7 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 		waitUntil = defaultWaitUntil
 	}
 	if !validWaitUntil[waitUntil] {
-		writeError(w, http.StatusBadRequest, "wait_until must be one of: load, domcontentloaded, networkidle0, networkidle2")
+		writeError(w, http.StatusBadRequest, "wait_until must be one of: load, domcontentloaded, networkidle, done")
 		return
 	}
 	waitMs := req.WaitMs
@@ -222,8 +222,8 @@ var browseToolDescriptor = map[string]any{
 			},
 			"wait_until": map[string]any{
 				"type":        "string",
-				"enum":        []string{"load", "domcontentloaded", "networkidle0", "networkidle2"},
-				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle2' (default) waits until the page has nearly stopped making network requests, and 'networkidle0' waits until it is fully idle. Use a networkidle option for pages whose content loads via background fetch/XHR after the initial load.",
+				"enum":        []string{"load", "domcontentloaded", "networkidle", "done"},
+				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes idle — best for pages whose content loads via background fetch/XHR after the initial load; 'done' waits until all in-flight operations complete.",
 			},
 			"wait_selector": map[string]any{
 				"type":        "string",
@@ -231,7 +231,7 @@ var browseToolDescriptor = map[string]any{
 			},
 			"wait_ms": map[string]any{
 				"type":        "integer",
-				"description": "Optional additional settle delay in milliseconds after the wait condition is met, before capturing (max 30000). Useful as a fallback when content keeps rendering briefly after the network goes idle.",
+				"description": "Optional maximum time in milliseconds to wait for the wait_until condition before capturing anyway (a timeout cap, max 30000). Raise it for slow pages whose network takes a while to go idle.",
 			},
 		},
 		"required": []string{"url"},
