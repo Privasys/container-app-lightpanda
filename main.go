@@ -93,8 +93,11 @@ var validWaitUntil = map[string]bool{
 }
 
 const (
-	defaultWaitUntil = "networkidle" // wait until network activity goes idle
-	maxWaitMs        = 30000         // hard cap on the caller-supplied settle delay
+	// 'done' (wait until all page operations finish) is lightpanda's own default
+	// when no wait condition is given, and best for capturing fully-rendered
+	// content. 'networkidle' resolves earlier (when the network goes quiet).
+	defaultWaitUntil = "done"
+	maxWaitMs        = 30000 // hard cap on the wait deadline (lightpanda default: 5000)
 )
 
 type browseResponse struct {
@@ -223,15 +226,15 @@ var browseToolDescriptor = map[string]any{
 			"wait_until": map[string]any{
 				"type":        "string",
 				"enum":        []string{"load", "domcontentloaded", "networkidle", "networkalmostidle", "done"},
-				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle' (default) waits until network activity goes fully idle — best for pages whose content loads via background fetch/XHR after the initial load; 'networkalmostidle' is more lenient (tolerates a couple of lingering connections, e.g. keep-alive/analytics) and is a good fallback when 'networkidle' never settles; 'done' waits until all in-flight operations complete.",
+				"description": "When to capture the page. 'done' (default) waits until ALL page operations finish — best for fully-rendered content. 'networkidle' captures earlier, when the network goes quiet (faster, but may miss late content). 'networkalmostidle' tolerates a couple of lingering connections (keep-alive/analytics). 'load' / 'domcontentloaded' fire earliest. This is the lever for how long to wait — wait_ms is only the deadline, not a delay.",
 			},
 			"wait_selector": map[string]any{
 				"type":        "string",
-				"description": "Optional CSS selector to wait for before capturing the page. Use this when you know the element that holds the content you need (most precise way to wait for client-side-rendered content).",
+				"description": "Optional CSS selector to wait for before capturing the page. The most precise way to wait for specific client-side-rendered content — capture happens once this element appears (or wait_ms elapses).",
 			},
 			"wait_ms": map[string]any{
 				"type":        "integer",
-				"description": "Optional maximum time in milliseconds to wait for the wait_until condition before capturing anyway (a timeout cap, max 30000). Raise it for slow pages whose network takes a while to go idle.",
+				"description": "Maximum time in milliseconds to wait for the wait_until / wait_selector condition before giving up and capturing whatever is there (a deadline/timeout, NOT a fixed delay — there is no fixed-sleep mode). Default 5000, max 30000. Raise it for slow pages.",
 			},
 		},
 		"required": []string{"url"},
