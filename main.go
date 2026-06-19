@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -73,7 +74,28 @@ func main() {
 type browseRequest struct {
 	URL    string `json:"url"`
 	Format string `json:"format"` // "markdown" or "html" (default: "markdown")
+
+	// Wait strategy — controls when the page DOM is captured. Without one,
+	// the page is dumped at "load", before content that arrives via async
+	// fetch/XHR has rendered. Pages that build their content client-side
+	// (search results, dashboards, SPAs) need to wait for the network to
+	// settle or for a specific element to appear.
+	WaitUntil    string `json:"wait_until"`    // load|domcontentloaded|networkidle0|networkidle2 (default: networkidle2)
+	WaitSelector string `json:"wait_selector"` // CSS selector to wait for before dumping
+	WaitMs       int    `json:"wait_ms"`       // additional settle delay in ms (capped)
 }
+
+// validWaitUntil is the lifecycle-event whitelist accepted by lightpanda's
+// `fetch --wait-until` (Puppeteer semantics). Anything else is rejected so a
+// bad value can't reach the subprocess.
+var validWaitUntil = map[string]bool{
+	"load": true, "domcontentloaded": true, "networkidle0": true, "networkidle2": true,
+}
+
+const (
+	defaultWaitUntil = "networkidle2" // wait until the page basically stops fetching
+	maxWaitMs        = 30000          // hard cap on the caller-supplied settle delay
+)
 
 type browseResponse struct {
 	URL     string `json:"url"`
@@ -113,10 +135,26 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	waitUntil := req.WaitUntil
+	if waitUntil == "" {
+		waitUntil = defaultWaitUntil
+	}
+	if !validWaitUntil[waitUntil] {
+		writeError(w, http.StatusBadRequest, "wait_until must be one of: load, domcontentloaded, networkidle0, networkidle2")
+		return
+	}
+	waitMs := req.WaitMs
+	if waitMs < 0 {
+		waitMs = 0
+	}
+	if waitMs > maxWaitMs {
+		waitMs = maxWaitMs
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
 
-	content, err := fetchURL(ctx, req.URL, format)
+	content, err := fetchURL(ctx, req.URL, format, waitUntil, req.WaitSelector, waitMs)
 	if err != nil {
 		log.Printf("[browse] error fetching %s: %v", req.URL, err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("fetch failed: %v", err))
@@ -130,8 +168,18 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func fetchURL(ctx context.Context, url, format string) (string, error) {
-	args := []string{"fetch", "--dump", format, url}
+func fetchURL(ctx context.Context, url, format, waitUntil, waitSelector string, waitMs int) (string, error) {
+	args := []string{"fetch", "--dump", format}
+	if waitUntil != "" {
+		args = append(args, "--wait-until", waitUntil)
+	}
+	if waitSelector != "" {
+		args = append(args, "--wait-selector", waitSelector)
+	}
+	if waitMs > 0 {
+		args = append(args, "--wait-ms", strconv.Itoa(waitMs))
+	}
+	args = append(args, url)
 
 	cmd := exec.CommandContext(ctx, "/bin/lightpanda", args...)
 	var stdout, stderr bytes.Buffer
@@ -159,7 +207,7 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 var browseToolDescriptor = map[string]any{
 	"name":        "browse",
-	"description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Call this whenever the user references a URL and you need the page contents to answer.",
+	"description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Call this whenever the user references a URL and you need the page contents to answer. For pages that build their content client-side (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
 	"input_schema": map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -171,6 +219,19 @@ var browseToolDescriptor = map[string]any{
 				"type":        "string",
 				"enum":        []string{"markdown", "html"},
 				"description": "Output format (default: markdown)",
+			},
+			"wait_until": map[string]any{
+				"type":        "string",
+				"enum":        []string{"load", "domcontentloaded", "networkidle0", "networkidle2"},
+				"description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle2' (default) waits until the page has nearly stopped making network requests, and 'networkidle0' waits until it is fully idle. Use a networkidle option for pages whose content loads via background fetch/XHR after the initial load.",
+			},
+			"wait_selector": map[string]any{
+				"type":        "string",
+				"description": "Optional CSS selector to wait for before capturing the page. Use this when you know the element that holds the content you need (most precise way to wait for client-side-rendered content).",
+			},
+			"wait_ms": map[string]any{
+				"type":        "integer",
+				"description": "Optional additional settle delay in milliseconds after the wait condition is met, before capturing (max 30000). Useful as a fallback when content keeps rendering briefly after the network goes idle.",
 			},
 		},
 		"required": []string{"url"},

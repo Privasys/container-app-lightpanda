@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "browse",
-      "description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Ideal for extracting readable content from web pages for AI processing.",
+      "description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Ideal for extracting readable content from web pages for AI processing. For pages that build their content client-side (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
       "endpoint": "/browse",
       "inputSchema": {
         "type": "object",
@@ -19,6 +19,25 @@
             ],
             "description": "Output format for the page content (default: markdown)",
             "default": "markdown"
+          },
+          "wait_until": {
+            "type": "string",
+            "enum": [
+              "load",
+              "domcontentloaded",
+              "networkidle0",
+              "networkidle2"
+            ],
+            "description": "When to capture the page. 'load' / 'domcontentloaded' fire early; 'networkidle2' (default) waits until the page has nearly stopped making network requests, and 'networkidle0' waits until it is fully idle. Use a networkidle option for pages whose content loads via background fetch/XHR after the initial load.",
+            "default": "networkidle2"
+          },
+          "wait_selector": {
+            "type": "string",
+            "description": "Optional CSS selector to wait for before capturing the page. Use this when you know the element that holds the content you need (most precise way to wait for client-side-rendered content)."
+          },
+          "wait_ms": {
+            "type": "integer",
+            "description": "Optional additional settle delay in milliseconds after the wait condition is met, before capturing (max 30000). Useful as a fallback when content keeps rendering briefly after the network goes idle."
           }
         },
         "required": [
