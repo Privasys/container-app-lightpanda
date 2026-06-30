@@ -40,25 +40,29 @@
         },
         "required": ["url"]
       }
-    },
-    {
-      "name": "configure",
-      "role": "config",
-      "endpoint": "/configure",
-      "description": "Owner setup: choose which domains this tool is allowed to fetch (a safety policy that prevents it being used to reach arbitrary internal or unintended hosts). Set once per deployment; the tool stays locked (returns 'awaiting initial configuration') until configured, and re-locks on every restart. Not a tool the assistant calls.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "allowed_domains": {
-            "type": "string",
-            "description": "Comma-separated list of domains the tool may fetch (subdomains included), or * to allow any.",
-            "x-privasys": { "label": "Allowed domains" }
-          }
-        },
-        "required": ["allowed_domains"]
-      }
     }
   ],
+  "configure": {
+    "endpoint": "/configure",
+    "name": "configure",
+    "title": "Web access policy",
+    "description": "Choose which sites this tool is allowed to open. Required once before the tool can serve; it re-locks on every restart, so set it again after a redeploy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "allowed_domains": {
+          "type": "string",
+          "description": "Comma-separated domains (subdomains included), or * for any.",
+          "x-privasys": {
+            "label": "Allowed domains",
+            "placeholder": "example.com, docs.example.com",
+            "details": "A safety policy that stops the tool being used to reach arbitrary internal or unintended hosts. Until you set it, the tool stays locked and returns 'awaiting initial configuration'."
+          }
+        }
+      },
+      "required": ["allowed_domains"]
+    }
+  },
   "store": {
     "tagline": "Let your AI assistant read web pages, inside a confidential enclave.",
     "category": "AI Tools",
