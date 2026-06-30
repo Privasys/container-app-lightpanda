@@ -17,11 +17,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -39,6 +41,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/browse", handleBrowse)
+	mux.HandleFunc("/configure", handleConfigure)
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/healthz", handleHealth)
 	// MCP-compatible endpoints so any MCP-aware agent (confidential-ai
@@ -132,6 +135,12 @@ func handleBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce the owner-configured fetch policy (see /configure).
+	if !hostAllowed(req.URL) {
+		writeError(w, http.StatusForbidden, "this host is not in the configured allowed-domains policy")
+		return
+	}
+
 	format := req.Format
 	if format == "" {
 		format = "markdown"
@@ -200,6 +209,82 @@ func fetchURL(ctx context.Context, url, format, waitUntil, waitSelector string, 
 }
 
 // ---------------------------------------------------------------------------
+//  /configure — owner-set fetch policy (configure-then-freeze, role:config)
+// ---------------------------------------------------------------------------
+//
+// The manifest tags this endpoint role:"config", so the enclave manager keeps
+// every other path at HTTP 503 ("awaiting initial configuration") until the
+// first 2xx here, then auto-lifts the gate. The app holds no freeze logic and
+// does not call config-complete. The policy is in-memory, so the gate re-arms
+// on every restart and the owner re-submits — matching the platform contract.
+
+var (
+	policyMu       sync.RWMutex
+	allowedDomains []string // lower-cased domains; subdomains allowed
+	allowAllHosts  bool     // true when "*" was configured
+)
+
+type configureRequest struct {
+	AllowedDomains string `json:"allowed_domains"`
+}
+
+func handleConfigure(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	var req configureRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	var list []string
+	all := false
+	for _, d := range strings.Split(req.AllowedDomains, ",") {
+		d = strings.ToLower(strings.TrimSpace(d))
+		switch {
+		case d == "":
+			continue
+		case d == "*":
+			all = true
+		default:
+			list = append(list, d)
+		}
+	}
+	if !all && len(list) == 0 {
+		writeError(w, http.StatusBadRequest,
+			"allowed_domains is required: a comma-separated list of domains, or * for any")
+		return
+	}
+	policyMu.Lock()
+	allowedDomains = list
+	allowAllHosts = all
+	policyMu.Unlock()
+	// Returning 2xx lifts the manager's configure-then-freeze gate.
+	writeJSON(w, http.StatusOK, map[string]string{"status": "configured"})
+}
+
+// hostAllowed reports whether the fetch policy permits the given URL's host.
+func hostAllowed(rawurl string) bool {
+	policyMu.RLock()
+	defer policyMu.RUnlock()
+	if allowAllHosts {
+		return true
+	}
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, d := range allowedDomains {
+		if host == d || strings.HasSuffix(host, "."+d) {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
 //  /health
 // ---------------------------------------------------------------------------
 
@@ -213,18 +298,18 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 var browseToolDescriptor = map[string]any{
 	"name":        "browse",
-	"description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Call this whenever the user references a URL and you need the page contents to answer. For pages that build their content client-side (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
+	"description": "Fetch a web page by URL and return its readable content as Markdown (or HTML). Use this to read the full content of a specific page — a URL the user gives you, or a result found via web search — when a search snippet is not enough to answer. For pages that build their content in the browser (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
 	"input_schema": map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"url": map[string]any{
 				"type":        "string",
-				"description": "The URL of the web page to fetch (must start with http:// or https://)",
+				"description": "The full URL of the page to read, including http:// or https://.",
 			},
 			"format": map[string]any{
 				"type":        "string",
 				"enum":        []string{"markdown", "html"},
-				"description": "Output format (default: markdown)",
+				"description": "Return the content as 'markdown' (default, readable) or 'html' (raw).",
 			},
 			"wait_until": map[string]any{
 				"type":        "string",

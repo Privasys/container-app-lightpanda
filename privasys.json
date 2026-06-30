@@ -2,22 +2,19 @@
   "tools": [
     {
       "name": "browse",
-      "description": "Fetch a web page using the Lightpanda headless browser and return its content as markdown or HTML. Ideal for extracting readable content from web pages for AI processing. For pages that build their content client-side (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
+      "description": "Fetch a web page by URL and return its readable content as Markdown (or HTML). Use this to read the full content of a specific page — for example a URL the user gives you, or a result you found via web search — when a search snippet is not enough to answer. For pages that build their content in the browser (search results, dashboards, single-page apps), use the wait_* parameters so the dynamically loaded content is captured.",
       "endpoint": "/browse",
       "inputSchema": {
         "type": "object",
         "properties": {
           "url": {
             "type": "string",
-            "description": "The URL of the web page to fetch (must start with http:// or https://)"
+            "description": "The full URL of the page to read, including http:// or https://."
           },
           "format": {
             "type": "string",
-            "enum": [
-              "markdown",
-              "html"
-            ],
-            "description": "Output format for the page content (default: markdown)",
+            "enum": ["markdown", "html"],
+            "description": "Return the content as 'markdown' (default, readable) or 'html' (raw).",
             "default": "markdown"
           },
           "wait_until": {
@@ -41,10 +38,35 @@
             "description": "Maximum time in milliseconds to wait for the wait_until / wait_selector condition before giving up and capturing whatever is there (a deadline/timeout, NOT a fixed delay — there is no fixed-sleep mode). Default 5000, max 30000. Raise it for slow pages."
           }
         },
-        "required": [
-          "url"
-        ]
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "configure",
+      "role": "config",
+      "endpoint": "/configure",
+      "description": "Owner setup: choose which domains this tool is allowed to fetch (a safety policy that prevents it being used to reach arbitrary internal or unintended hosts). Set once per deployment; the tool stays locked (returns 'awaiting initial configuration') until configured, and re-locks on every restart. Not a tool the assistant calls.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allowed_domains": {
+            "type": "string",
+            "description": "Comma-separated list of domains the tool may fetch (subdomains included), or * to allow any.",
+            "x-privasys": { "label": "Allowed domains" }
+          }
+        },
+        "required": ["allowed_domains"]
       }
     }
-  ]
+  ],
+  "store": {
+    "tagline": "Let your AI assistant read web pages, inside a confidential enclave.",
+    "category": "AI Tools",
+    "keywords": "web page, fetch, read url, browse, markdown, web content, ai tool, mcp, confidential computing, attested, enclave",
+    "website_url": "https://privasys.org",
+    "support_email": "contact@privasys.org",
+    "privacy_url": "https://privasys.org/legal/privacy/",
+    "tos_url": "https://privasys.org/legal/terms/",
+    "description": "Web Page Reader gives an AI assistant the ability to open a specific web page and return its main content as clean Markdown (or raw HTML), so it can read and reason over the full text of a page rather than just a search snippet — useful for following a link the user shared, or digging into a result found via web search.\n\nThe page is fetched and rendered entirely inside a confidential enclave: the URL and the retrieved content are processed in hardware-isolated, attestable memory. The owner configures, once at deploy time, which domains the tool may reach, so it can never be turned into an open proxy to unintended hosts. Verifying clients can confirm exactly which build is running before they trust its output.\n\nAdd it to an AI assistant alongside web search to go from 'here are some links' to 'here is what the page actually says.'"
+  }
 }
