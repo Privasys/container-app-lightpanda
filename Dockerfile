@@ -26,9 +26,8 @@ COPY --from=lightpanda /bin/lightpanda /bin/lightpanda
 # Copy the Go API wrapper
 COPY --from=builder /lightpanda-api /bin/lightpanda-api
 
-# Documentation only (host networking ignores EXPOSE). The platform injects
-# $PORT; 8000 is the local-run default. 8080 is reserved for the platform.
-EXPOSE 8000
+# No EXPOSE: the app binds the platform-injected $PORT. Under host networking
+# EXPOSE is a no-op anyway, and there is no fixed port to advertise.
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/bin/lightpanda-api"]

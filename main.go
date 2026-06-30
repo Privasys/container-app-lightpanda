@@ -28,15 +28,12 @@ import (
 	"time"
 )
 
-// defaultPort is a local-run fallback only; the platform injects $PORT (host
-// networking, so the listen port is the host port). Never 8080 — that is
-// reserved for the platform.
-const defaultPort = "8000"
-
 func main() {
+	// The platform injects $PORT (host networking, so the listen port is the
+	// host port). It is required — there is no hard-coded fallback port.
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = defaultPort
+		log.Fatal("PORT environment variable is required")
 	}
 
 	mux := http.NewServeMux()

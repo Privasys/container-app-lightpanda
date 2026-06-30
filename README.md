@@ -53,7 +53,7 @@ docker build -t container-app-lightpanda .
 ## Running Locally
 
 ```bash
-docker run -p 8000:8000 container-app-lightpanda
+docker run -e PORT=8000 -p 8000:8000 container-app-lightpanda
 ```
 
 Test the browse tool:
