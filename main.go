@@ -26,7 +26,10 @@ import (
 	"time"
 )
 
-const defaultPort = "8080"
+// defaultPort is a local-run fallback only; the platform injects $PORT (host
+// networking, so the listen port is the host port). Never 8080 — that is
+// reserved for the platform.
+const defaultPort = "8000"
 
 func main() {
 	port := os.Getenv("PORT")

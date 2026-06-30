@@ -53,12 +53,12 @@ docker build -t container-app-lightpanda .
 ## Running Locally
 
 ```bash
-docker run -p 8080:8080 container-app-lightpanda
+docker run -p 8000:8000 container-app-lightpanda
 ```
 
 Test the browse tool:
 ```bash
-curl -X POST http://localhost:8080/browse \
+curl -X POST http://localhost:8000/browse \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "format": "markdown"}'
 ```
