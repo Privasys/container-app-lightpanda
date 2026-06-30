@@ -206,19 +206,21 @@ func fetchURL(ctx context.Context, url, format, waitUntil, waitSelector string, 
 }
 
 // ---------------------------------------------------------------------------
-//  /configure — owner-set fetch policy (configure-then-freeze, role:config)
+//  /configure — owner-set fetch policy (OPTIONAL)
 // ---------------------------------------------------------------------------
 //
-// The manifest tags this endpoint role:"config", so the enclave manager keeps
-// every other path at HTTP 503 ("awaiting initial configuration") until the
-// first 2xx here, then auto-lifts the gate. The app holds no freeze logic and
-// does not call config-complete. The policy is in-memory, so the gate re-arms
-// on every restart and the owner re-submits — matching the platform contract.
+// The manifest declares this in an `configure` section marked optional with a
+// default of "*", so the platform does NOT freeze the app: it serves straight
+// away and may fetch any host. The owner may POST here at any time to RESTRICT
+// the tool to specific domains (set "*" to go back to any). The policy is
+// in-memory, so it resets to the allow-any default on every restart.
 
 var (
 	policyMu       sync.RWMutex
 	allowedDomains []string // lower-cased domains; subdomains allowed
-	allowAllHosts  bool     // true when "*" was configured
+	// Default to allow-any so the tool works out of the box (optional config);
+	// /configure may flip this off and set an explicit allowedDomains list.
+	allowAllHosts = true
 )
 
 type configureRequest struct {

@@ -45,18 +45,20 @@
   "configure": {
     "endpoint": "/configure",
     "name": "configure",
+    "optional": true,
     "title": "Web access policy",
-    "description": "Choose which sites this tool is allowed to open. Required once before the tool can serve; it re-locks on every restart, so set it again after a redeploy.",
+    "description": "By default this tool may open any site. Optionally restrict it to a set of allowed domains.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "allowed_domains": {
           "type": "string",
+          "default": "*",
           "description": "Comma-separated domains (subdomains included), or * for any.",
           "x-privasys": {
             "label": "Allowed domains",
             "placeholder": "example.com, docs.example.com",
-            "details": "A safety policy that stops the tool being used to reach arbitrary internal or unintended hosts. Until you set it, the tool stays locked and returns 'awaiting initial configuration'."
+            "details": "A safety policy that stops the tool being used to reach arbitrary internal or unintended hosts. It resets to allow-any on every restart, so re-apply your list after a redeploy."
           }
         }
       },
